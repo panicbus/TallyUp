@@ -33,6 +33,32 @@ function persistConsentedPhones(slug: string, phones: Set<string>): void {
   }
 }
 
+type ConfirmedCheckin = { points: number; eligibleForRedemption: boolean };
+
+// A QR scan is meant to be single-use per visit: once staff confirms it, the
+// form must not come back from a refresh or a Back-button remount. Scoped to
+// sessionStorage (not localStorage) so this only dead-ends the current tab
+// until it's closed, not the customer's next real visit.
+function confirmedStorageKey(slug: string): string {
+  return `tallyup:checkin-confirmed:${slug}`;
+}
+function loadConfirmedCheckin(slug: string): ConfirmedCheckin | null {
+  try {
+    const raw = sessionStorage.getItem(confirmedStorageKey(slug));
+    return raw ? (JSON.parse(raw) as ConfirmedCheckin) : null;
+  } catch {
+    return null;
+  }
+}
+function persistConfirmedCheckin(slug: string, checkin: ConfirmedCheckin): void {
+  try {
+    sessionStorage.setItem(confirmedStorageKey(slug), JSON.stringify(checkin));
+  } catch {
+    // Private mode / storage disabled — a refresh will lose the dead-end,
+    // but the history trap below still blocks the Back button this session.
+  }
+}
+
 type Phase =
   | { name: 'loading' }
   | { name: 'not_found' }
@@ -58,9 +84,25 @@ export function CheckIn() {
   useEffect(() => {
     getBusiness(slug).then((found) => {
       setBusiness(found);
-      setPhase(found ? { name: 'form' } : { name: 'not_found' });
+      if (!found) {
+        setPhase({ name: 'not_found' });
+        return;
+      }
+      const confirmed = !isDemo && loadConfirmedCheckin(slug);
+      setPhase(confirmed ? { name: 'confirmed', ...confirmed } : { name: 'form' });
     });
-  }, [slug]);
+  }, [slug, isDemo]);
+
+  useEffect(() => {
+    if (isDemo || phase.name !== 'confirmed') return;
+    // Trap the Back button on the dead-end screen: pushing a state and
+    // re-pushing on every popstate means Back never actually navigates away
+    // from here, so it can't resurrect the check-in form for a used QR scan.
+    history.pushState(null, '', location.href);
+    const trapBack = () => history.pushState(null, '', location.href);
+    window.addEventListener('popstate', trapBack);
+    return () => window.removeEventListener('popstate', trapBack);
+  }, [isDemo, phase.name]);
 
   useEffect(() => {
     if (phase.name !== 'waiting') return;
@@ -72,7 +114,9 @@ export function CheckIn() {
       if (cancelled) return;
 
       if (status.status === 'confirmed') {
-        setPhase({ name: 'confirmed', points: status.customer.points, eligibleForRedemption: status.eligibleForRedemption });
+        const confirmed = { points: status.customer.points, eligibleForRedemption: status.eligibleForRedemption };
+        if (!isDemo) persistConfirmedCheckin(slug, confirmed);
+        setPhase({ name: 'confirmed', ...confirmed });
       } else if (status.status === 'expired' || status.status === 'not_found') {
         setPhase({ name: 'expired' });
       }
