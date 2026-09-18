@@ -139,10 +139,19 @@ pilot (3–5 shops). Solo project, built with Claude Code. Repo:
 - **`/card` phone lookup has no rate-limit-beyond-IP defense** against
   someone targeting one already-known number — accepted risk, documented in
   ADR-0004, not a bug.
-- Two pre-existing Privacy-policy inaccuracies were fixed in the last commit
-  (SMS-consent carve-out disclosure, dropped the false "we can delete your
-  number" promise) — worth double-checking no other copy/reality mismatches
-  remain.
+- Two pre-existing Privacy-policy inaccuracies were fixed in an earlier
+  commit (SMS-consent carve-out disclosure, dropped the false "we can delete
+  your number" promise) — worth double-checking no other copy/reality
+  mismatches remain.
+- **First-party event tracking and contact-capture (leads/unsubscribe/email
+  outreach) are deliberately deferred**, not built — see the plan this came
+  from (`.claude/plans/i-want-to-track-elegant-crayon.md` if still present,
+  or ADR-0005) for the full reasoning. Revisit at roughly 15 pilot shops, or
+  sooner if a specific decision genuinely can't be made without event data.
+  What *did* ship: an `ops.shop_health` view plus a weekly digest email
+  (`.github/workflows/shop-health-digest.yml`), and two anonymous PostHog
+  click counters on the check-in and confirm buttons (ADR-0005) — neither of
+  those needed the deferred build.
 
 ## Dev environment (at last check)
 

@@ -59,12 +59,18 @@ describe('CheckInQrCode', () => {
 
     // Capture the actual <img> the handler creates internally (a fresh
     // `new Image()` from the test wouldn't be the same element) so its real
-    // onload — including the business-name drawing — actually runs.
+    // onload — including the business-name drawing — actually runs. jsdom
+    // never actually decodes the image, so width/height stay 0 unless
+    // stubbed; left at 0, canvas.width goes negative and the mocked
+    // measureText (a fixed 50) then "overflows" any width, truncating even
+    // a short name regardless of its real length.
     const OriginalImage = window.Image;
     const created: HTMLImageElement[] = [];
     class SpyImage extends OriginalImage {
       constructor(...args: ConstructorParameters<typeof Image>) {
         super(...args);
+        Object.defineProperty(this, 'width', { value: 164, configurable: true });
+        Object.defineProperty(this, 'height', { value: 164, configurable: true });
         created.push(this);
       }
     }

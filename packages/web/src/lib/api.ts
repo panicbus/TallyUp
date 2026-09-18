@@ -8,6 +8,22 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// The one shared chokepoint every function below routes through. It owns
+// only the mechanical parts: the API_URL prefix, attaching the Bearer header
+// when asked, and the fetch call itself. It deliberately does NOT touch
+// status codes or response bodies — every function below still reads
+// response.status / response.json() / response.blob() exactly as it did
+// before this existed, because several of them depend on status-specific
+// behavior a generic "throw on !ok" wrapper would silently break:
+// revokeInvite treats 404 as success, and createBusiness has to read the
+// body before it can decide its 409 outcome. See api.test.ts, which pins
+// both of those down.
+async function request(path: string, init?: RequestInit & { auth?: boolean }): Promise<Response> {
+  const { auth, headers, ...rest } = init ?? {};
+  const authHeader = auth ? await authHeaders() : {};
+  return fetch(`${API_URL}${path}`, { ...rest, headers: { ...headers, ...authHeader } });
+}
+
 export interface MeResponse {
   id: string;
   email: string;
@@ -112,7 +128,7 @@ export type CheckinStatusResponse =
   | { status: 'not_found' };
 
 export async function getBusiness(slug: string): Promise<BusinessSummary | null> {
-  const response = await fetch(`${API_URL}/businesses/${slug}`);
+  const response = await request(`/businesses/${slug}`);
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Failed to load business (${response.status})`);
   return response.json();
@@ -123,7 +139,7 @@ export async function createPendingCheckin(
   phone: string,
   smsConsent: boolean,
 ): Promise<{ id: string; expiresAt: string; hasSmsConsent: boolean }> {
-  const response = await fetch(`${API_URL}/businesses/${slug}/pending-checkins`, {
+  const response = await request(`/businesses/${slug}/pending-checkins`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone, smsConsent }),
@@ -133,21 +149,21 @@ export async function createPendingCheckin(
 }
 
 export async function getCheckinStatus(pendingCheckinId: string): Promise<CheckinStatusResponse> {
-  const response = await fetch(`${API_URL}/pending-checkins/${pendingCheckinId}/status`);
+  const response = await request(`/pending-checkins/${pendingCheckinId}/status`);
   if (response.status === 404) return { status: 'not_found' };
   if (!response.ok) throw new Error(`Failed to load status (${response.status})`);
   return response.json();
 }
 
 export async function getMe(): Promise<MeResponse | null> {
-  const response = await fetch(`${API_URL}/me`, { headers: await authHeaders() });
+  const response = await request('/me', { auth: true });
   if (response.status === 401) return null;
   if (!response.ok) throw new Error(`Failed to load session (${response.status})`);
   return response.json();
 }
 
 export async function getPendingCheckins(slug: string): Promise<QueuedPendingCheckin[]> {
-  const response = await fetch(`${API_URL}/businesses/${slug}/pending-checkins`, { headers: await authHeaders() });
+  const response = await request(`/businesses/${slug}/pending-checkins`, { auth: true });
   if (!response.ok) throw new Error(`Failed to load queue (${response.status})`);
   return response.json();
 }
@@ -161,7 +177,7 @@ export interface BusinessStats {
 }
 
 export async function getBusinessStats(slug: string): Promise<BusinessStats> {
-  const response = await fetch(`${API_URL}/businesses/${slug}/stats`, { headers: await authHeaders() });
+  const response = await request(`/businesses/${slug}/stats`, { auth: true });
   if (!response.ok) throw new Error(`Failed to load stats (${response.status})`);
   return response.json();
 }
@@ -175,7 +191,7 @@ export async function getCustomers(
     sort: params.sort,
     dir: params.dir,
   });
-  const response = await fetch(`${API_URL}/businesses/${slug}/customers?${query}`, { headers: await authHeaders() });
+  const response = await request(`/businesses/${slug}/customers?${query}`, { auth: true });
   if (!response.ok) throw new Error(`Failed to load customers (${response.status})`);
   return response.json();
 }
@@ -184,15 +200,15 @@ export async function getCustomers(
 // auth here is a Bearer header, which a plain <a href> can't send. The
 // caller turns this into a download via a temporary object URL.
 export async function exportCustomersCsv(slug: string): Promise<Blob> {
-  const response = await fetch(`${API_URL}/businesses/${slug}/customers/export`, { headers: await authHeaders() });
+  const response = await request(`/businesses/${slug}/customers/export`, { auth: true });
   if (!response.ok) throw new Error(`Failed to export customers (${response.status})`);
   return response.blob();
 }
 
 export async function confirmCheckin(pendingCheckinId: string): Promise<ConfirmCheckinResponse> {
-  const response = await fetch(`${API_URL}/pending-checkins/${pendingCheckinId}/confirm`, {
+  const response = await request(`/pending-checkins/${pendingCheckinId}/confirm`, {
     method: 'POST',
-    headers: await authHeaders(),
+    auth: true,
   });
   if (response.status === 404) return { outcome: 'not_found' };
   if (!response.ok) throw new Error(`Failed to confirm (${response.status})`);
@@ -200,9 +216,9 @@ export async function confirmCheckin(pendingCheckinId: string): Promise<ConfirmC
 }
 
 export async function redeem(customerId: string): Promise<RedeemResponse> {
-  const response = await fetch(`${API_URL}/customers/${customerId}/redeem`, {
+  const response = await request(`/customers/${customerId}/redeem`, {
     method: 'POST',
-    headers: await authHeaders(),
+    auth: true,
   });
   if (response.status === 409) return { outcome: 'not_eligible' };
   if (!response.ok) throw new Error(`Failed to redeem (${response.status})`);
@@ -216,9 +232,10 @@ export async function createBusiness(input: {
   rewardDescription: string;
   logoUrl: string | null;
 }): Promise<CreateBusinessResponse> {
-  const response = await fetch(`${API_URL}/businesses`, {
+  const response = await request('/businesses', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: { 'Content-Type': 'application/json' },
+    auth: true,
     body: JSON.stringify(input),
   });
   if (response.status === 409) {
@@ -233,9 +250,10 @@ export async function updateBusiness(
   slug: string,
   input: { name: string; rewardThreshold: number; rewardDescription: string; logoUrl: string | null },
 ): Promise<OnboardedBusiness> {
-  const response = await fetch(`${API_URL}/businesses/${slug}`, {
+  const response = await request(`/businesses/${slug}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: { 'Content-Type': 'application/json' },
+    auth: true,
     body: JSON.stringify(input),
   });
   if (!response.ok) throw new Error(`Failed to update business (${response.status})`);
@@ -269,7 +287,7 @@ export interface StaffRosterResponse {
 }
 
 export async function getStaffRoster(slug: string): Promise<StaffRosterResponse> {
-  const response = await fetch(`${API_URL}/businesses/${slug}/staff`, { headers: await authHeaders() });
+  const response = await request(`/businesses/${slug}/staff`, { auth: true });
   if (!response.ok) throw new Error(`Failed to load staff (${response.status})`);
   return response.json();
 }
@@ -277,9 +295,10 @@ export async function getStaffRoster(slug: string): Promise<StaffRosterResponse>
 /** Sets the signed-in staff member's own display name (empty string clears
  * it). Returns the refreshed me-shape. */
 export async function updateMyName(name: string): Promise<MeResponse> {
-  const response = await fetch(`${API_URL}/me`, {
+  const response = await request('/me', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: { 'Content-Type': 'application/json' },
+    auth: true,
     body: JSON.stringify({ name }),
   });
   if (!response.ok) throw new Error(`Failed to save your name (${response.status})`);
@@ -295,9 +314,10 @@ export type CreateInviteResponse =
   | { outcome: 'email_failed' };
 
 export async function createInvite(slug: string, email: string, role: StaffRole): Promise<CreateInviteResponse> {
-  const response = await fetch(`${API_URL}/businesses/${slug}/invites`, {
+  const response = await request(`/businesses/${slug}/invites`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: { 'Content-Type': 'application/json' },
+    auth: true,
     body: JSON.stringify({ email, role }),
   });
   if (response.status === 400) return { outcome: 'invalid_email' };
@@ -321,7 +341,7 @@ export interface InviteDescription {
 /** Unauthenticated: the invitee has no account yet. Null for an unknown,
  * expired, revoked, or already-redeemed code. */
 export async function lookupInvite(code: string): Promise<InviteDescription | null> {
-  const response = await fetch(`${API_URL}/invites/lookup`, {
+  const response = await request('/invites/lookup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code }),
@@ -352,7 +372,7 @@ export interface CustomerCard {
  * from the server's and is a real error, not an outcome to swallow. See
  * ADR-0004 for why this endpoint exists at all. */
 export async function lookupCards(phone: string): Promise<CustomerCard[]> {
-  const response = await fetch(`${API_URL}/cards/lookup`, {
+  const response = await request('/cards/lookup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone }),
@@ -363,9 +383,9 @@ export async function lookupCards(phone: string): Promise<CustomerCard[]> {
 }
 
 export async function revokeInvite(inviteId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/invites/${inviteId}/revoke`, {
+  const response = await request(`/invites/${inviteId}/revoke`, {
     method: 'POST',
-    headers: await authHeaders(),
+    auth: true,
   });
   // 404 = already gone (used, expired, or revoked) — the caller's intent is
   // satisfied either way, so don't treat it as an error.
@@ -377,9 +397,9 @@ export async function revokeInvite(inviteId: string): Promise<void> {
 export type DeactivateStaffResponse = { outcome: 'deactivated' } | { outcome: 'last_owner' };
 
 export async function deactivateStaffMember(staffId: string): Promise<DeactivateStaffResponse> {
-  const response = await fetch(`${API_URL}/staff/${staffId}/deactivate`, {
+  const response = await request(`/staff/${staffId}/deactivate`, {
     method: 'POST',
-    headers: await authHeaders(),
+    auth: true,
   });
   if (response.status === 409) return { outcome: 'last_owner' };
   if (!response.ok) throw new Error(`Failed to deactivate staff member (${response.status})`);
@@ -394,9 +414,10 @@ export type RedeemInviteResponse =
   | { outcome: 'already_staff' };
 
 export async function redeemInvite(code: string): Promise<RedeemInviteResponse> {
-  const response = await fetch(`${API_URL}/invites/redeem`, {
+  const response = await request('/invites/redeem', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: { 'Content-Type': 'application/json' },
+    auth: true,
     body: JSON.stringify({ code }),
   });
   if (response.status === 400) return { outcome: 'invalid_code' };

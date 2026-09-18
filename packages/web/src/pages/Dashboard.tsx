@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Inbox } from 'lucide-react';
 import { confirmCheckin, getBusinessStats, getMe, getPendingCheckins, redeem } from '../lib/api';
+import { trackCheckinConfirmed } from '../lib/analytics';
 import type { BusinessStats, MeResponse, QueuedPendingCheckin } from '../lib/api';
 import { supabaseClient } from '../lib/supabase';
 import { PendingCheckinRow } from '../components/PendingCheckinRow';
@@ -84,6 +85,7 @@ export function Dashboard() {
     refreshStats();
 
     if (result.outcome === 'confirmed') {
+      trackCheckinConfirmed();
       setResults((current) => [
         {
           id: crypto.randomUUID(),

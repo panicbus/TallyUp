@@ -1,6 +1,6 @@
 {
   "name": "@tallyup/api",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "migrate": "tsx src/data-access/migrate.ts",
-    "seed": "tsx src/data-access/seed.ts"
+    "seed": "tsx src/data-access/seed.ts",
+    "digest": "tsx src/data-access/shop-health-digest.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

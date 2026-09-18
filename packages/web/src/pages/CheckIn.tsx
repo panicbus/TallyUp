@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { SearchX, Clock } from 'lucide-react';
 import { normalizePhone } from '@tallyup/shared';
 import { createPendingCheckin, getBusiness, getCheckinStatus } from '../lib/api';
+import { trackCheckinSubmitted } from '../lib/analytics';
 import type { BusinessSummary } from '../lib/api';
 import { CheckInForm } from '../components/CheckInForm';
 import { CustomerCard } from '../components/CustomerCard';
@@ -95,6 +96,7 @@ export function CheckIn() {
 
     setPhase({ name: 'submitting' });
     const pending = await createPendingCheckin(slug, phone, smsConsent);
+    trackCheckinSubmitted();
 
     if (pending.hasSmsConsent) {
       const e164 = normalizePhone(phone);
