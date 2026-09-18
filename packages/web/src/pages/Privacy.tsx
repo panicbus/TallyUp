@@ -62,7 +62,11 @@ export function Privacy() {
         <li>We don't sell customer data or share it with other businesses.</li>
         <li>We don't text your customers yet. Consent is collected now so that feature is possible later; nothing is
           sent until it exists, and every message will include a way to opt out.</li>
-        <li>We don't run any visitor tracking on the check-in page or the punch-balance lookup page.</li>
+        <li>
+          We don't track who visits the check-in page or the punch-balance lookup page. The check-in page has the
+          two anonymous button-click counters described above and nothing else; the punch-balance lookup page has no
+          tracking at all.
+        </li>
       </ul>
 
       <h2>Where it lives</h2>
