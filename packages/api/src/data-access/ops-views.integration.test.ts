@@ -39,6 +39,51 @@ describe('ops.shop_health', () => {
     expect(result.rows[0]?.state).toBe('never_activated');
     expect(result.rows[0]?.last_visit_at).toBeNull();
   });
+
+  test('visits_7d counts each visit once, however many customers the shop has', async ({ db }) => {
+    const business = await db
+      .insertInto('businesses')
+      .values({
+        name: 'Ops Count Shop',
+        slug: `ops-test-${crypto.randomUUID()}`,
+        reward_threshold: 10,
+        reward_description: 'Free thing',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const staff = await db
+      .insertInto('staff')
+      .values({ business_id: business.id, email: `ops-${crypto.randomUUID()}@example.com`, role: 'owner' })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const customers = await db
+      .insertInto('customers')
+      .values(
+        ['+15555550201', '+15555550202', '+15555550203', '+15555550204'].map((phone) => ({
+          business_id: business.id,
+          phone,
+        })),
+      )
+      .returningAll()
+      .execute();
+    await db
+      .insertInto('visits')
+      .values(
+        customers.slice(0, 3).map((customer) => ({
+          business_id: business.id,
+          customer_id: customer.id,
+          confirmed_by: staff.id,
+        })),
+      )
+      .execute();
+
+    const result = await sql<{ customers: string; visits_7d: string }>`
+      select customers, visits_7d from ops.shop_health where id = ${business.id}
+    `.execute(db);
+
+    expect(result.rows[0]?.customers).toBe('4');
+    expect(result.rows[0]?.visits_7d).toBe('3');
+  });
 });
 
 describe('ops schema isolation', () => {
