@@ -1,21 +1,23 @@
 import posthog from 'posthog-js';
+import { isProjectApiKey } from './posthog-key';
 
 // Exactly two counters, nothing else: how often the check-in button and the
 // staff confirm button get used. No autocapture, no pageviews (Vercel
 // Analytics already covers those), no session recording, and
 // person_profiles: 'never' so PostHog never creates a per-visitor profile —
 // every event is anonymous by construction, not by convention. Missing
-// VITE_POSTHOG_KEY (local dev, or before the key is configured in Vercel)
-// leaves this a no-op rather than an error.
+// VITE_POSTHOG_KEY (local dev, or before the key is configured in Vercel),
+// or a key that is not a project API key, leaves this a no-op rather than an
+// error.
 let initialized = false;
 
 function init(): boolean {
   if (initialized) return true;
   const key = import.meta.env.VITE_POSTHOG_KEY;
-  if (!key) return false;
+  if (!key || !isProjectApiKey(key)) return false;
   try {
     posthog.init(key, {
-      api_host: import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com',
+      api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
       person_profiles: 'never',
       autocapture: false,
       capture_pageview: false,
