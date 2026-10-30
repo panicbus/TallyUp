@@ -130,8 +130,10 @@ chicken-and-egg wait:
    from the true repo root regardless). Framework preset (Vite) and build
    output are auto-detected; `packages/web/vercel.json` adds the SPA
    rewrite client-side routing needs. Env vars: `VITE_SUPABASE_URL`,
-   `VITE_SUPABASE_ANON_KEY` (same as local), and `VITE_API_URL` set to the
-   Render URL from step 2.
+   `VITE_SUPABASE_ANON_KEY` (same as local), `VITE_API_URL` set to the
+   Render URL from step 2, and optionally `VITE_POSTHOG_KEY`: the PostHog
+   *project* API key (`phc_...`), never a personal API key (`phx_...`).
+   The build fails on any other key.
 
 4. **Go back to Render** and update `CORS_ORIGIN` to the real Vercel URL
    (no trailing slash). Changing an env var triggers an automatic

@@ -34,6 +34,29 @@ describe('analytics', () => {
     expect(posthog.capture).toHaveBeenCalledWith('checkin_submitted');
   });
 
+  it('never initializes with a personal API key', async () => {
+    vi.stubEnv('VITE_POSTHOG_KEY', 'phx_personal_key');
+    const { trackCheckinSubmitted } = await import('./analytics');
+
+    trackCheckinSubmitted();
+
+    expect(posthog.init).not.toHaveBeenCalled();
+    expect(posthog.capture).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the US host when VITE_POSTHOG_HOST is set but blank', async () => {
+    vi.stubEnv('VITE_POSTHOG_KEY', 'phc_test_key');
+    vi.stubEnv('VITE_POSTHOG_HOST', '');
+    const { trackCheckinSubmitted } = await import('./analytics');
+
+    trackCheckinSubmitted();
+
+    expect(posthog.init).toHaveBeenCalledWith(
+      'phc_test_key',
+      expect.objectContaining({ api_host: 'https://us.i.posthog.com' }),
+    );
+  });
+
   it('captures the confirm event under its own name', async () => {
     vi.stubEnv('VITE_POSTHOG_KEY', 'phc_test_key');
     const { trackCheckinConfirmed } = await import('./analytics');
