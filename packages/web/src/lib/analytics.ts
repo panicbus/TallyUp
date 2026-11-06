@@ -41,6 +41,19 @@ function projectKey(): string {
   return import.meta.env.PROD ? (import.meta.env.VITE_POSTHOG_KEY ?? '') : '';
 }
 
+// A PostHog toolbar opened once from the PostHog app saves itself in local
+// storage and then shows an "Authenticate" bar on every page. Forget it
+// before PostHog starts so it never comes back on its own.
+export const TOOLBAR_STORAGE_KEY = '_postHogToolbarParams';
+
+function forgetToolbar() {
+  try {
+    window.localStorage.removeItem(TOOLBAR_STORAGE_KEY);
+  } catch {
+    // No local storage: nothing to forget.
+  }
+}
+
 let counters: PostHog | null = null;
 let visitsReady = false;
 
@@ -48,6 +61,7 @@ function countersInstance(): PostHog | null {
   if (counters) return counters;
   const key = projectKey();
   if (!key) return null;
+  forgetToolbar();
   counters = posthog.init(key, { ...QUIET, persistence: 'memory' }, 'counters') ?? null;
   return counters;
 }
@@ -56,6 +70,7 @@ function visitsInstance(): boolean {
   if (visitsReady) return true;
   const key = projectKey();
   if (!key) return false;
+  forgetToolbar();
   posthog.init(key, QUIET);
   visitsReady = true;
   return true;

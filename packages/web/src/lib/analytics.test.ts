@@ -99,6 +99,16 @@ describe('analytics', () => {
     },
   );
 
+  it('forgets a saved PostHog toolbar before starting, so its bar never reappears', async () => {
+    vi.stubEnv('VITE_POSTHOG_KEY', 'phc_test_key');
+    const { trackPageview, TOOLBAR_STORAGE_KEY } = await import('./analytics');
+    window.localStorage.setItem(TOOLBAR_STORAGE_KEY, '{"token":"phc_test_key"}');
+
+    trackPageview('/');
+
+    expect(window.localStorage.getItem(TOOLBAR_STORAGE_KEY)).toBeNull();
+  });
+
   it('does not throw even if capture itself throws', async () => {
     vi.stubEnv('VITE_POSTHOG_KEY', 'phc_test_key');
     counters.capture.mockImplementationOnce(() => {
