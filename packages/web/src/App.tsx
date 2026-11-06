@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { Analytics } from '@vercel/analytics/react';
+import { trackPageview } from './lib/analytics';
 import { Landing } from './pages/Landing';
 import { Dashboard } from './pages/Dashboard';
 import { CheckIn } from './pages/CheckIn';
@@ -16,16 +17,15 @@ import { StaffManagement } from './pages/StaffManagement';
 import { Terms } from './pages/Terms';
 import { Privacy } from './pages/Privacy';
 
-// Vercel Analytics' automatic pageview collection is excluded from
-// /checkin/:slug and /card on purpose: those are the two screens where a
-// customer types a phone number, and the privacy policy promises no visitor
-// analytics runs there. The two explicit PostHog counters in lib/analytics.ts
-// (button clicks, no properties, no identity) are unaffected by this — they
-// aren't Vercel Analytics and aren't gated on the route.
-function RouteScopedAnalytics() {
+// One PostHog page visit per screen. trackPageview skips /checkin/:slug and
+// /card, the two screens where a customer types a phone number, because the
+// privacy policy promises no visitor tracking there (ADR-0006).
+function PageviewTracker() {
   const { pathname } = useLocation();
-  const excluded = pathname.startsWith('/checkin/') || pathname === '/card';
-  return excluded ? null : <Analytics />;
+  useEffect(() => {
+    trackPageview(pathname);
+  }, [pathname]);
+  return null;
 }
 
 export default function App() {
@@ -48,7 +48,7 @@ export default function App() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
       </Routes>
-      <RouteScopedAnalytics />
+      <PageviewTracker />
     </BrowserRouter>
   );
 }

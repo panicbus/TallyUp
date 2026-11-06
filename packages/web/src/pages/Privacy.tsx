@@ -2,7 +2,7 @@ import { LegalPage } from '../components/LegalPage';
 
 export function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" updated="September 2026">
+    <LegalPage title="Privacy Policy" updated="November 2026">
 
       <h2>What we collect</h2>
       <ul>
@@ -31,18 +31,21 @@ export function Privacy() {
 
       <h2>How we measure usage</h2>
       <p>
-        We use two outside services for this, and neither one gets your customers' phone numbers or any way to
+        We use one outside service for this, PostHog, and it never gets your customers' phone numbers or any way to
         identify a specific person.
       </p>
       <p>
-        Vercel Analytics counts page visits on most of the site, so we can see things like how many people land on
-        the homepage. It's turned off entirely on the check-in page and the punch-balance lookup page: those two
-        screens get no visitor tracking of any kind.
+        PostHog counts page visits on most of the site, so we can see things like how many people land on the
+        homepage. A visit records the page, the site you came from, your browser and device type, and an approximate
+        location worked out from your IP address. A random identifier is kept in a cookie and in your browser's
+        local storage so repeat visits aren't counted twice. Visit counting is turned off entirely on the check-in
+        page and the punch-balance lookup page: those two screens get no visitor tracking of any kind.
       </p>
       <p>
-        PostHog counts two things, and only two things: how often the check-in button gets used, and how often a
-        staff member taps Confirm. Each is a plain tally with no name, phone number, or other detail attached, and
-        PostHog is set up to never build a profile of who did the clicking.
+        Separately, PostHog counts two things, and only two things: how often the check-in button gets used, and how
+        often a staff member taps Confirm. Each is a plain tally with no name, phone number, or other detail
+        attached. These tallies keep nothing on the device, so they can't be linked to a page visit or to each other,
+        and PostHog is set up to never build a profile of who did the clicking.
       </p>
 
       <h2>Checking a punch balance</h2>
@@ -72,7 +75,7 @@ export function Privacy() {
       <h2>Where it lives</h2>
       <p>
         Data is stored with our hosting provider (Supabase, on infrastructure in the United States). Page-visit and
-        button-click counts are processed by Vercel and PostHog. Access to your data is restricted to the TallyUp
+        button-click counts are processed by PostHog, also in the United States. Access to your data is restricted to the TallyUp
         team and your own staff accounts.
       </p>
 
